@@ -17,18 +17,22 @@ var user = {
 
 var list_user = [];
 io.on('connection', (socket) => {
+  console.log(socket.id);
+  console.log("connected");
   socket.on('getUserInfo', (socket_id, user_info) => {
-    if (list_user !== null) {
-      var pos = list_user.findIndex(i => i.text === user_info.text);
-      var pos_socket = list_user.findIndex(i => i.socket_id === user_info.socket_id);
-      if (pos_socket < 0 && pos < 0) {
-        list_user.push(user_info);
-      } 
-    } else {
+    if (user_info != null) {
+      user_info.socket_id = socket_id;
       list_user.push(user_info);
     }
-    console.log(list_user);
-    io.local.emit("sendListUser", list_user)
+    var flags = [], tmp_list = [];
+    for (let i = 0; i < list_user.length; i++) {
+      if (flags[list_user[i].name]) continue;
+      flags[list_user[i].name] = true;
+      tmp_list.push(list_user[i]);
+    }
+    io.local.emit("sendListUser", tmp_list);
+    list_user = tmp_list;
+    console.log(tmp_list);
   })
   socket.on('chat', (msg) => {
     console.log('message: ' + msg);
@@ -55,10 +59,18 @@ io.on('connection', (socket) => {
   socket.on('disconnect', () => {
     console.log(socket.id);
     console.log('user disconnected');
+
     var pos_ind = list_user.findIndex(i => i.socket_id === socket.id);
-    if(pos_ind > -1) {
+    if (pos_ind > -1) {
       list_user.splice(pos_ind, 1);
     }
+    var pos_ind = list_user.findIndex(i => i.socket_id === undefined);
+    if (pos_ind > -1) {
+      list_user.splice(pos_ind, 1);
+    }
+    console.log(list_user);
+    console.log(list_user.length);
+   // io.local.emit("sendListUser", list_user);
   });
 });
 
