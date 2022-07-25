@@ -9,52 +9,79 @@ app.get('/', (req, res) => {
   res.sendFile(__dirname + '/index.html');
 });
 
-var user = {
-  name: "abc",
-  age: 15,
-  info: "test"
+let listUser = [];
+let listChecked = [];
+let allStatus = {
+  isSpin: false,
+  isCheckAll: false,
+  listItem: []
 }
 
-var listUser = [];
-var listChecked = [];
 io.on('connection', (socket) => {
-  console.log(socket.id);
-  socket.on('getUserInfo', (socketId, userInfo, allStatusWheel) => {
-    
+  socket.on('sendUserAccess', (socketId, userInfo, allStatusWheel) => {
+    allStatus.listItem = allStatusWheel.listItem;
+    //console.log(allStatusWheel.isCheckAll);
+
     if (userInfo != null) {
       userInfo.socketId = socketId;
       listUser.push(userInfo);
     }
     var flags = [], tmpList = [];
     for (let i = 0; i < listUser.length; i++) {
-      if (flags[listUser[i].name]) continue;
-      flags[listUser[i].name] = true;
+      if (flags[listUser[i].username]) continue;
+      flags[listUser[i].username] = true;
+
+      if (allStatus.isCheckAll === true && allStatus.isSpin === false) {
+        listUser[i].checked = true;
+      }
+
       tmpList.push(listUser[i]);
     }
-    io.local.emit("receiveListUser", tmpList); //HÀM emit sẽ chuyển thông tin đến tất cà các client
     listUser = tmpList;
-    allStatusWheel.listItem = tmpList;
-    console.log(allStatusWheel);
+
+    if (allStatus.isSpin === false) {
+      console.log("abc:"+ allStatus.isSpin);
+      socket.broadcast.emit('resetWheelSpin');
+    }
+
+    io.local.emit("receiveListUser", listUser); //HÀM emit sẽ chuyển thông tin đến tất cà các client
+
+    allStatusWheel.listItem = listUser;
   })
 
-  socket.on('myClick', function (data, flag, name, allStatusWheel) {
-    console.log(allStatusWheel);
+  socket.on('clickCheckAllMember', function (isChecked, allStatusWheel) {
+    allStatus.isCheckAll = isChecked;
 
     //hàm này chuyển thông tin từ 1 socketclient đang thao tác trên màn hình đến những socketclient khác
-    socket.broadcast.emit('checkAllItem', data, flag, name);
+    listUser = allStatusWheel.listItem;
+    socket.broadcast.emit('checkAllMember', isChecked);
   });
 
+
+  socket.on('clickCheckOneMember', function (idElement, isChecked, allStatusWheel) {
+
+    //hàm này chuyển thông tin từ 1 socketclient đang thao tác trên màn hình đến những socketclient khác
+    if (isChecked === false) {
+      allStatus.isCheckAll = isChecked;
+    }
+    listUser = allStatusWheel.listItem;
+    socket.broadcast.emit('checkOneMember', idElement, isChecked);
+  });
+
+
   socket.on('spinWheel', function (random) {
+    allStatus.isSpin = true;
     socket.broadcast.emit('spinWheelSocket', random);
   })
 
   socket.on('resetWheel', () => {
+    allStatus.isSpin = false;
     socket.broadcast.emit('resetWheelSpin');
   })
 
 
   socket.on('disconnect', () => {
-    console.log('user disconnected');
+    //  allStatus.isSpin = false;
     var pos_ind = listUser.findIndex(i => i.socketId === socket.id);
     if (pos_ind > -1) {
       listUser.splice(pos_ind, 1);
@@ -63,13 +90,18 @@ io.on('connection', (socket) => {
     if (pos_ind > -1) {
       listUser.splice(pos_ind, 1);
     }
+    if (allStatus.isSpin === false) {
+      allStatus.isSpin = false;
+      socket.broadcast.emit('resetWheelSpin');
+    }
 
-    io.local.emit("sendListUser", listUser);
+    console.log(listUser);
+    console.log(allStatus.isSpin);
+
+    io.local.emit("receiveListUserDisconnect", listUser, allStatus.isSpin);
   });
 });
 
 server.listen(4000, () => {
   console.log('listening on *:4000');
 });
-
-
